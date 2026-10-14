@@ -1,7 +1,6 @@
 # Reto Fullstack: Gestión de Pedidos
 
-Aplicación fullstack para autenticación de usuarios y gestión (CRUD) de pedidos.
-
+Reto de Metrica, para gestión de pedidos, el stack es el siguiente:
 - **Backend:** .NET 8, API REST, Clean Architecture, EF Core, SQL Server, JWT
 - **Frontend:** React + TypeScript (Vite), Tailwind CSS, TanStack Query
 - **Base de datos:** SQL Server 2022 en Docker
