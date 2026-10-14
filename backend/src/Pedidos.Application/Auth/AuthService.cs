@@ -19,9 +19,7 @@ namespace Pedidos.Application.Auth
         {
             var usuario = await usuarioRepository.GetByEmailAsync(request.Email.Trim().ToLower(), ct);
             if (usuario is null || !passwordHasher.Verify(request.Password, usuario.PasswordHash))
-            {
-                throw new UnauthorizedException("Credenciales inválidas");
-            }
+                throw new UnauthorizedException("Credenciales inválidas.");
             var token = tokenService.Generate(usuario);
             return new LoginResponse(token.AccessToken, token.ExpiresIn, usuario.Rol.ToString());
         }

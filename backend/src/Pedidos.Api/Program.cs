@@ -71,6 +71,11 @@ builder.Services.AddRateLimiter(o =>
         }, ct);
     };
 });
+builder.Services.AddCors(o => o.AddPolicy("frontend", p => p
+    .WithOrigins(builder.Configuration["Cors:Origin"] ?? "http://localhost:5173")
+    .AllowAnyHeader()
+    .AllowAnyMethod()
+    .WithExposedHeaders("Retry-After")));
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -128,6 +133,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+app.UseCors("frontend");
 
 app.UseHttpsRedirection();
 app.UseAuthentication();

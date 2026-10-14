@@ -10,6 +10,7 @@ using Pedidos.Application.Auth;
 
 namespace Pedidos.Api.Controllers
 {
+    [ApiController]    
     [Route("[controller]")]
     public class AuthController(AuthService authService) : Controller
     {
