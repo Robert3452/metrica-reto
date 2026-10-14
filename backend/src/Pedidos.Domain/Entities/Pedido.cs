@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Pedidos.Domain.Enums;
+using Pedidos.Domain.Exceptions;
 
 namespace Pedidos.Domain.Entities
 {
@@ -22,5 +23,40 @@ namespace Pedidos.Domain.Entities
             Estado = estado;
             Fecha = fecha;
         }
+        private static readonly Dictionary<Estado, Estado[]> Transiciones = new()
+        {
+            [Estado.Registrado] = [Estado.EnProceso, Estado.Cancelado],
+            [Estado.EnProceso] = [Estado.Enviado, Estado.Cancelado],
+            [Estado.Enviado] = [Estado.Entregado],
+            [Estado.Entregado] = [],
+            [Estado.Cancelado] = []
+        };
+
+        public void CambiarEstado(Estado nuevo)
+        {
+            if (!Transiciones[Estado].Contains(nuevo))
+                throw new DomainException($"No se puede pasar de {Estado} a {nuevo}.");
+
+            Estado = nuevo;
+        }
+        public void Actualizar(string cliente, decimal total)
+        {
+            if (Estado is Estado.Entregado or Estado.Cancelado)
+                throw new DomainException("No se puede modificar un pedido cerrado.");
+            if (string.IsNullOrWhiteSpace(cliente))
+                throw new DomainException("El cliente es obligatorio.");
+            if (total <= 0)
+                throw new DomainException("El total debe ser mayor a cero.");
+
+            Cliente = cliente.Trim();
+            Total = total;
+        }
+        public void Cancelar()
+        {
+            if (Estado == Estado.Entregado)
+                throw new DomainException("No se puede cancelar un pedido entregado.");
+            Estado = Estado.Cancelado;
+        }
+
     }
 }

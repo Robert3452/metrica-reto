@@ -20,7 +20,7 @@ namespace Pedidos.Infrastructure.Persistence
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
 
-            await db.Database.MigrateAsync();            // migraciones automáticas
+            await db.Database.MigrateAsync();
 
             if (await db.Usuarios.AnyAsync()) return;
 

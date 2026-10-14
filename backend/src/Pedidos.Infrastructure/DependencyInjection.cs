@@ -29,6 +29,7 @@ namespace Pedidos.Infrastructure
             services.AddScoped<IUsuarioRepository, UsuarioRepository>();
             services.AddScoped<IPasswordHasher, PasswordHasher>();
             services.AddScoped<ITokenService, JwtTokenService>();
+            services.AddScoped<IPedidoRepository, PedidoRepository>();
 
             services.AddDbContext<AppDbContext>(opt => opt.UseSqlServer(
             configuration.GetConnectionString("Default"),

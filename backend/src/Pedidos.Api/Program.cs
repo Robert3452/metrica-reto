@@ -1,10 +1,15 @@
 using System.Text;
+using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Pedidos.Api.Middleware;
+using Pedidos.Api.Services;
 using Pedidos.Application;
+using Pedidos.Application.Abstractions;
 using Pedidos.Infrastructure;
 using Pedidos.Infrastructure.Persistence;
 using Pedidos.Infrastructure.Security;
@@ -17,7 +22,8 @@ builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
-
+builder.Services.AddControllers()
+    .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
@@ -25,6 +31,49 @@ builder.Services.AddProblemDetails();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 var jwt = builder.Configuration.GetSection(JwtSettings.Section).Get<JwtSettings>()!;
+
+
+builder.Services.AddRateLimiter(o =>
+{
+    o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    // Login: estricto y por IP (aún no hay usuario autenticado)
+    o.AddPolicy("login", ctx => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 5,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0
+        }));
+
+    // API: más holgado y por usuario (claim "sub")
+    o.AddPolicy("api", ctx => RateLimitPartition.GetSlidingWindowLimiter(
+        partitionKey: ctx.User.FindFirst("sub")?.Value
+                      ?? ctx.Connection.RemoteIpAddress?.ToString()
+                      ?? "unknown",
+        factory: _ => new SlidingWindowRateLimiterOptions
+        {
+            PermitLimit = 100,
+            Window = TimeSpan.FromMinutes(1),
+            SegmentsPerWindow = 6,
+            QueueLimit = 0
+        }));
+
+    // Respuesta consistente con tu ProblemDetails
+    o.OnRejected = async (context, ct) =>
+    {
+        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+            context.HttpContext.Response.Headers.RetryAfter = ((int)retryAfter.TotalSeconds).ToString();
+
+        await context.HttpContext.Response.WriteAsJsonAsync(new ProblemDetails
+        {
+            Status = StatusCodes.Status429TooManyRequests,
+            Title = "Demasiadas solicitudes",
+            Detail = "Intenta nuevamente en unos momentos."
+        }, ct);
+    };
+});
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -45,6 +94,9 @@ builder.Services
             RoleClaimType = "role"
         };
     });
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentUser, CurrentUser>();
+
 builder.Services.AddAuthorizationBuilder()
 .SetFallbackPolicy(new AuthorizationPolicyBuilder()
     .RequireAuthenticatedUser()
@@ -72,7 +124,7 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 var app = builder.Build();
-await DbSeeder.SeedAsync(app.Services); 
+await DbSeeder.SeedAsync(app.Services);
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
