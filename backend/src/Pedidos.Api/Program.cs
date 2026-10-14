@@ -37,7 +37,6 @@ builder.Services.AddRateLimiter(o =>
 {
     o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
-    // Login: estricto y por IP (aún no hay usuario autenticado)
     o.AddPolicy("login", ctx => RateLimitPartition.GetFixedWindowLimiter(
         partitionKey: ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
         factory: _ => new FixedWindowRateLimiterOptions
@@ -47,7 +46,6 @@ builder.Services.AddRateLimiter(o =>
             QueueLimit = 0
         }));
 
-    // API: más holgado y por usuario (claim "sub")
     o.AddPolicy("api", ctx => RateLimitPartition.GetSlidingWindowLimiter(
         partitionKey: ctx.User.FindFirst("sub")?.Value
                       ?? ctx.Connection.RemoteIpAddress?.ToString()
@@ -60,7 +58,6 @@ builder.Services.AddRateLimiter(o =>
             QueueLimit = 0
         }));
 
-    // Respuesta consistente con tu ProblemDetails
     o.OnRejected = async (context, ct) =>
     {
         if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
